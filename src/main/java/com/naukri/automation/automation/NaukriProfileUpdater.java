@@ -32,6 +32,7 @@ public class NaukriProfileUpdater {
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(25));
 
             // 1) Login using GitHub Secrets
+            // 1) Login using GitHub Secrets
             String username = System.getenv("NAUKRI_USERNAME");
             String passwordStr = System.getenv("NAUKRI_PASSWORD");
 
@@ -39,11 +40,32 @@ public class NaukriProfileUpdater {
                 throw new RuntimeException("❌ GitHub Secrets not set for NAUKRI_USERNAME / NAUKRI_PASSWORD");
             }
 
-            WebElement email = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("usernameField")));
-            WebElement password = driver.findElement(By.id("passwordField"));
+            WebElement email;
+            try {
+                // Try by ID
+                email = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("usernameField")));
+            } catch (Exception e) {
+                // Fallback: generic text/email input
+                email = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                        By.xpath("//input[@type='text' or @type='email']")
+                ));
+            }
+
+            WebElement password;
+            try {
+                password = driver.findElement(By.id("passwordField"));
+            } catch (Exception e) {
+                password = driver.findElement(By.xpath("//input[@type='password']"));
+            }
+
             email.sendKeys(username);
             password.sendKeys(passwordStr);
-            driver.findElement(By.xpath("//button[normalize-space()='Login']")).click();
+
+// Click Login
+            WebElement loginBtn = wait.until(ExpectedConditions.elementToBeClickable(
+                    By.xpath("//button[normalize-space()='Login'] | //button[contains(text(),'Sign in')]")
+            ));
+            loginBtn.click();
 
             // 2) Click "View profile"
             WebElement viewProfile = wait.until(ExpectedConditions.elementToBeClickable(
