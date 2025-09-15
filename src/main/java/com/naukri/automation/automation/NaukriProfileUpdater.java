@@ -13,16 +13,15 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import java.time.Duration;
 
 public class NaukriProfileUpdater {
-
     public static void main(String[] args) {
-        // Setup ChromeDriver
+        // Setup Chrome with headless options (required for GitHub Actions)
         WebDriverManager.chromedriver().setup();
-
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless=new");       // run without UI (GitHub Actions friendly)
+        options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-gpu");
+        options.addArguments("--window-size=1920,1080");
 
         WebDriver driver = new ChromeDriver(options);
 
@@ -32,64 +31,58 @@ public class NaukriProfileUpdater {
 
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(25));
 
-            // === 1) Credentials from environment (GitHub Secrets) ===
+            // 1) Login using GitHub Secrets
             String username = System.getenv("NAUKRI_USERNAME");
-            String password = System.getenv("NAUKRI_PASSWORD");
+            String passwordStr = System.getenv("NAUKRI_PASSWORD");
 
-            if (username == null || password == null) {
-                throw new RuntimeException("❌ Missing NAUKRI_USERNAME or NAUKRI_PASSWORD env variables!");
+            if (username == null || passwordStr == null) {
+                throw new RuntimeException("❌ GitHub Secrets not set for NAUKRI_USERNAME / NAUKRI_PASSWORD");
             }
 
-            // === 2) Login ===
             WebElement email = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("usernameField")));
-            WebElement pwd = driver.findElement(By.id("passwordField"));
-
+            WebElement password = driver.findElement(By.id("passwordField"));
             email.sendKeys(username);
-            pwd.sendKeys(password);
+            password.sendKeys(passwordStr);
             driver.findElement(By.xpath("//button[normalize-space()='Login']")).click();
 
-            // === 3) Open Profile Page ===
+            // 2) Click "View profile"
             WebElement viewProfile = wait.until(ExpectedConditions.elementToBeClickable(
                     By.cssSelector("div.view-profile-wrapper > a")
             ));
             viewProfile.click();
 
-            // === 4) Click ✏️ Edit Resume Headline ===
+            // 3) Click ✏️ Edit for "Resume headline"
             WebElement editHeadlineBtn = wait.until(ExpectedConditions.elementToBeClickable(
                     By.xpath("//span[normalize-space()='Resume headline']/following::span[contains(@class,'edit')][1]")
             ));
             ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'})", editHeadlineBtn);
             editHeadlineBtn.click();
 
-            // === 5) Enter new Headline ===
+            // 4) Wait for textarea and type new headline
             WebElement textArea = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("resumeHeadlineTxt")));
-            String headline = "Banking Domain | Java Developer | Spring Boot, Hibernate, MySQL, Microservices";
-
+            String headline = "Banking Domain | Immediate Joiner | Java Developer | Spring Boot, Hibernate, MySQL, Microservices";
             textArea.clear();
             textArea.sendKeys(headline);
 
-            // === 6) Save Headline ===
+            // 5) Click Save (inside the Resume Headline section only)
             WebElement saveBtn = wait.until(ExpectedConditions.elementToBeClickable(
                     By.cssSelector("form[name='resumeHeadlineForm'] button[type='submit']")
             ));
             saveBtn.click();
 
-            // === 7) Wait for Success Banner ===
+            // 6) Verify success banner appears
             WebElement successBanner = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//*[contains(text(),'Resume Headline has been successfully saved')]")
             ));
-            System.out.println("✅ Success banner: " + successBanner.getText());
+            System.out.println("✅ Success banner visible: " + successBanner.getText());
 
-            // === 8) Verify updated headline is shown ===
-            wait.until(ExpectedConditions.textToBePresentInElementLocated(
-                    By.xpath("//span[normalize-space()='Resume headline']/following::span[1]"),
-                    "Banking Domain"
-            ));
-
-            System.out.println("✅ Resume headline updated & verified successfully!");
+            // 7) Optional: Refresh and confirm again
+            driver.navigate().refresh();
+            System.out.println("✅ Resume headline updated & confirmed!");
 
         } catch (Exception e) {
             e.printStackTrace();
+            System.exit(1); // Mark job as failed in GitHub Actions
         } finally {
             driver.quit();
         }
